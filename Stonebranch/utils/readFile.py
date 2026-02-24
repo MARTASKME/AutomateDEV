@@ -105,3 +105,33 @@ def loadFile(filename, file_type='text', parent_dir_level=3, *dirs):
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None
+    
+    
+def readFolderJSONFiles(folder_path, *file_names):
+    folder = Path(folder_path)
+    json_files = {}
+    not_found_files = []
+    
+    # If no file names provided, find all JSON files in the folder
+    if not file_names:
+        file_names = [f.name for f in folder.glob('*.json')]
+    
+    for file_name in file_names:
+        file_path = folder / file_name
+        try:
+            with open(file_path, 'r') as file:
+                json_files[file_name] = json.load(file)
+        except FileNotFoundError:
+            not_found_files.append(file_name)
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+            not_found_files.append(file_name)
+    
+    if json_files:
+        print(f"JSON files loaded successfully ({len(json_files)} files loaded)")
+        if not_found_files:
+            print(f"Files not found: {not_found_files}")
+        return json_files
+    else:
+        print(f"Error: No files found in {folder_path}")
+        return None
