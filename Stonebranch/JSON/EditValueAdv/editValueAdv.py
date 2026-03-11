@@ -10,10 +10,10 @@ from utils.createFile import createJson
 from utils.createFile import createExcel
 from utils.readFile import readFolderJSONFiles
 
-JSON_FOLDER = "D:\\Tidlor\\Task_Clone\\Workflow_02\\Workspace\\"
-OUTPUT_JSON_FOLDER = "D:\\Tidlor\\Task_Clone\\Workflow_02\\Created_JSON\\"
+JSON_FOLDER = "D:\\Tidlor\\Task_Clone\\Workflow_05\\Workspace\\"
+OUTPUT_JSON_FOLDER = "D:\\Tidlor\\Task_Clone\\Workflow_05\\Created_JSON\\"
 
-OUTPUT_EXCEL_FILENAME = "C:\\Dev\\AutomateDEV\\Stonebranch\\JSON\\EditValueAdv\\Created_JSON_workflow_02_Log.xlsx"
+OUTPUT_EXCEL_FILENAME = "C:\\Dev\\AutomateDEV\\Stonebranch\\JSON\\EditValueAdv\\Created_JSON_workflow_05_Log.xlsx"
 OUTPUT_EXCEL_SHEETNAME = "Created_JSON_Log"
 
 REPLACE_TARGET = "AAGI"
@@ -35,15 +35,17 @@ REPLACE_WORD_LIST = [
     "VIB"
 ]
 
+REPLACE_JSON_FLAG = True
+
 SPECIAL_CASE_DICT = {
     # Remove
     "DEL_SYSID": True,
-    # Change field
+    # Change field and clear original value
     "AGENT_TO_AGENTVAR": False,
     "CRED_TO_CREDVAR": False,
     "FTP_AGENT_TO_FTP_AGENTVAR": False,
     "FTP_CRED_TO_FTP_CREDVAR": False,
-    "PASSPHRASE_TO_PASSPHRASEVAR": False,
+    "PASSPHRASE_TO_PASSPHRASEVAR": True,
     # Clean up
     "CLEAR_EMAIL_NOTIFICATION": False,
     "CLEAR_BUSINESS_SERVICE": False
@@ -79,26 +81,36 @@ def prepareSpecialCases(json_data_dict, special_case_dict):
     
     
     # Helper function to replace field1 value to field2 and clear field1 value
-    def replace_field1_with_field2(data, field1, field2):
+    def replace_fieldA_with_fieldB(data, field1, field2, sub_field1=None, sub_field2=None):
         if isinstance(data, dict):
             new_dict = {}
-            field1_value = data.get(field1, "")
+            field1_value = data.get(field1, None)
+            if sub_field1 and isinstance(field1_value, dict):
+                field1_value = field1_value.get(sub_field1, None)
             for k, v in data.items():
                 if k == field1:
-                    new_dict[field1] = None  # Clear the value of field1
-                elif k == field2:
-                    # Set field2 to the original field1 value (skip original field2)
-                    new_dict[field2] = field1_value if field1_value else v
+                    if sub_field1 and isinstance(v, dict) and sub_field1 in v:
+                        v[sub_field1] = None  # Clear the value of the specified sub-field in field1
+                        new_dict[k] = v
+                    else:
+                        v = None  # Clear the value of field1 if sub_field1 is not specified or doesn't exist
+                elif k == field2 and field1_value is not None:
+                    if sub_field2 and isinstance(v, dict) and field1_value is not None and sub_field2 in v:
+                        v[sub_field2] = field1_value  # Set the value of the specified sub-field in field2 to the value of field1
+                        new_dict[k] = v
+                    else:
+                        new_dict[k] = field1_value  # Set the value of field2 to the value of field1 if sub_field2 is not specified
                 else:
-                    new_dict[k] = replace_field1_with_field2(v, field1, field2)
+                    new_dict[k] = replace_fieldA_with_fieldB(v, field1, field2, sub_field1, sub_field2)
             # If field2 doesn't exist in original data, add it
-            if field2 not in data and field1_value:
+            if field2 not in data and field1_value is not None:
                 new_dict[field2] = field1_value
             return new_dict
         elif isinstance(data, list):
-            return [replace_field1_with_field2(item, field1, field2) for item in data]
+            return [replace_fieldA_with_fieldB(item, field1, field2, sub_field1, sub_field2) for item in data]
         else:
             return data
+
     
     # Helper function to clear the value of a specified field
     def clear_field_value(data, field):
@@ -127,25 +139,26 @@ def prepareSpecialCases(json_data_dict, special_case_dict):
         
         # Move value in "agent" to "agentVar" and clear "agent" value if the case is specified in the special_case_dict
         if special_case_dict.get("AGENT_TO_AGENTVAR", False):
-            json_data = replace_field1_with_field2(json_data, "agent", "agentVar")
+            json_data = replace_fieldA_with_fieldB(json_data, "agent", "agentVar")
         
         # Move value in "credentials" to "credentialsVar" and clear "credentials" value if the case is specified in the special_case_dict
         if special_case_dict.get("CRED_TO_CREDVAR", False):
-            json_data = replace_field1_with_field2(json_data, "credentials", "credentialsVar")
+            json_data = replace_fieldA_with_fieldB(json_data, "credentials", "credentialsVar")
+        
             
         # Move value in "ftpAgent" to "ftpAgentVar" and clear "ftpAgent" value if the case is specified in the special_case_dict
         if special_case_dict.get("FTP_AGENT_TO_FTP_AGENTVAR", False):
-            json_data = replace_field1_with_field2(json_data, "primaryBrokerRef", "primaryBroker")
-            json_data = replace_field1_with_field2(json_data, "secondaryBrokerRef", "secondaryBroker")
+            json_data = replace_fieldA_with_fieldB(json_data, "primaryBrokerRef", "primaryBroker")
+            json_data = replace_fieldA_with_fieldB(json_data, "secondaryBrokerRef", "secondaryBroker")
             
         # Move value in "ftpCredentials" to "ftpCredentialsVar" and clear "ftpCredentials" value if the case is specified in the special_case_dict
         if special_case_dict.get("FTP_CRED_TO_FTP_CREDVAR", False):
-            json_data = replace_field1_with_field2(json_data, "primaryCredentials", "primaryCredVar")
-            json_data = replace_field1_with_field2(json_data, "secondaryCredentials", "secondaryCredVar")
+            json_data = replace_fieldA_with_fieldB(json_data, "primaryCredentials", "primaryCredVar")
+            json_data = replace_fieldA_with_fieldB(json_data, "secondaryCredentials", "secondaryCredVar")
             
         # Move value in "passphrase" to "passphraseVar" and clear "passphrase" value if the case is specified in the special_case_dict
         if special_case_dict.get("PASSPHRASE_TO_PASSPHRASEVAR", False):
-            json_data = replace_field1_with_field2(json_data, "credentialField1", "credentialVarField1")
+            json_data = replace_fieldA_with_fieldB(json_data, "credentialField1", "credentialVarField1", "value", "value")
         
         # Clear value in "emailNotifications" if the case is specified in the special_case_dict
         if special_case_dict.get("CLEAR_EMAIL_NOTIFICATION", False):
